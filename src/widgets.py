@@ -669,6 +669,7 @@ class MultiCameraReader(QtWidgets.QMainWindow):
     # recording objects
     _start_time: datetime
     _last_time: datetime
+    _proc_time: float
     _rec_freq_spinbox: QtWidgets.QSpinBox
     _frq_wdg: OptionWidget
     _time_label_format = "{:02d}:{:02d}:{:02d}"
@@ -723,13 +724,6 @@ class MultiCameraReader(QtWidgets.QMainWindow):
         main_icon = main_icon.scaled(ICON_SIZE, ICON_SIZE)
         main_icon = QtGui.QIcon(main_icon)
 
-        # window setup
-        self.setWindowTitle("MultiCameraReader")
-        self.setWindowIcon(main_icon)
-        self.setMinimumSize(800, 600)
-        self.setStyleSheet("background-color: white")
-        self.setFont(QtGui.QFont("Arial", 15))
-
         # size policies
         policy_min = QtWidgets.QSizePolicy.Policy.Minimum
         policy_exp = QtWidgets.QSizePolicy.Policy.Expanding
@@ -749,7 +743,7 @@ class MultiCameraReader(QtWidgets.QMainWindow):
         self._rec_freq_spinbox.setSuffix("Hz")
         self._frq_wdg = OptionWidget(
             widgets=[self._rec_freq_spinbox],
-            label="Recording Frequency",
+            label="Frequency",
             tooltip="Adjust the recording frequency from the cameras.",
         )
 
@@ -772,7 +766,7 @@ class MultiCameraReader(QtWidgets.QMainWindow):
         self._save_button.clicked.connect(self._save_button_pressed)
         self._save_wdg = OptionWidget(
             widgets=[self._save_button],
-            label="Save data",
+            label="Save",
             tooltip="Save the recorded data",
         )
 
@@ -804,7 +798,7 @@ class MultiCameraReader(QtWidgets.QMainWindow):
         self._add_button.clicked.connect(self._add_button_pressed)
         self._add_wdg = OptionWidget(
             widgets=[self._add_button],
-            label="Add New",
+            label="Add",
             tooltip="Add a new device.",
         )
 
@@ -829,8 +823,13 @@ class MultiCameraReader(QtWidgets.QMainWindow):
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
 
-        # adjust the data
+        # window setup
         self._check_enabled()
+        self.setWindowTitle("MultiCamReader")
+        self.setWindowIcon(main_icon)
+        self.setStyleSheet("background-color: white")
+        self.setFont(QtGui.QFont("Arial", 12))
+        self.setMinimumSize(self.minimumSizeHint().width(), 600)
 
     def _update_colormaps(self):
         """update the colormap of all the available cameras"""
@@ -863,13 +862,17 @@ class MultiCameraReader(QtWidgets.QMainWindow):
     def _recorder(self):
         """function used to handle the data recording from multiple devices"""
         # check if new data have to be collected
+        target = 1 / int(self._rec_freq_spinbox.value())
         now = datetime.now()
         delta = (now - self._last_time).total_seconds()
-        if delta >= 1 / int(self._rec_freq_spinbox.value()):
-            for cam in list(self._buffer.keys()):
+        if delta + self._proc_time >= target:
+            for i, cam in enumerate(list(self._buffer.keys())):
                 last = cam.device.last_sample
                 if last is not None:
                     self._buffer[cam].append((now, last[-1]))
+                    if i == 0 and len(self._buffer[cam]) > 1:
+                        proc = (delta - target + 2 * self._proc_time) / 2
+                        self._proc_time = proc
             self._last_time = now
 
         # update the recording label
@@ -887,6 +890,7 @@ class MultiCameraReader(QtWidgets.QMainWindow):
                 self._buffer[cam] = deque()
             self._rec_button.setIcon(self._stop_icon)
             self._start_time = datetime.now()
+            self._proc_time = 0
             self._recording_handler.start(10)
         else:
             self._recording_handler.stop()
