@@ -137,3 +137,6 @@ __pycache__/
 *.exe
 
 .fake
+
+# builder
+*.spec
