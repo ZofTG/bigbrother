@@ -1,0 +1,5 @@
+opencv-python
+pyqt5
+qimage2ndarray
+numpy
+pythonnet==2.5.2
