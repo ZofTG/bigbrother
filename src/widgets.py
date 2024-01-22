@@ -400,7 +400,7 @@ class CameraWidget(QtWidgets.QWidget):
     def _close(self):
         """close the widget"""
         self.device.disconnect()
-        self._closed.emit(self.title())
+        self._closed.emit(self.device.id)
         self.close()
 
     def _update_view(self):
@@ -468,12 +468,14 @@ class CameraWidget(QtWidgets.QWidget):
 
         # label widget
         label = QtWidgets.QLabel(self._device.id)
-        label.setMinimumSize(label.minimumSizeHint())
 
         # policies and alignment
         policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
         policy_min = QtWidgets.QSizePolicy.Policy.Minimum
-        alignment = QtCore.Qt.AlignmentFlag.AlignHCenter
+        central_alignment = QtCore.Qt.AlignmentFlag.AlignHCenter
+        right_alignment = QtCore.Qt.AlignmentFlag.AlignRight
+        vert_alignment = QtCore.Qt.AlignmentFlag.AlignVCenter
+        bottom_alignment = QtCore.Qt.AlignmentFlag.AlignBottom
 
         # setup the options panel
         opt_layout = QtWidgets.QHBoxLayout()
@@ -482,16 +484,19 @@ class CameraWidget(QtWidgets.QWidget):
         opt_layout.addWidget(rot_wdg)
         opt_layout.addWidget(cls_wdg)
         opt_layout.addStretch()
-        opt_layout.setAlignment(alignment)
+        opt_layout.setAlignment(central_alignment)  # type: ignore
         opt_layout.setSpacing(0)
         opt_layout.setContentsMargins(0, 0, 0, 0)
         opt_wdg = QtWidgets.QWidget()
         opt_wdg.setLayout(opt_layout)
         opt_wdg.setSizePolicy(policy_min, policy_min)
         opt_wdg.setFont(QtGui.QFont("Arial", 10))
+        label.setSizePolicy(policy_exp, policy_min)
+        label.setAlignment(right_alignment | vert_alignment)  # type: ignore
 
         # image panel
         self._image_widget = ImageWidget()
+        self._image_widget.setAlignment(central_alignment | bottom_alignment)  # type: ignore
 
         # widget layout
         layout = QtWidgets.QVBoxLayout()
@@ -716,7 +721,7 @@ class BigBrother(QtWidgets.QMainWindow):
 
         # size policies
         policy_min = QtWidgets.QSizePolicy.Policy.Minimum
-        policy_exp = QtWidgets.QSizePolicy.Policy.Expanding
+        policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
 
         # container widget
         self._container = QtWidgets.QGridLayout()
@@ -819,7 +824,7 @@ class BigBrother(QtWidgets.QMainWindow):
         self.setWindowIcon(main_icon)
         self.setStyleSheet("background-color: white")
         self.setFont(QtGui.QFont("Arial", 12))
-        self.setMinimumSize(self.minimumSizeHint().width(), 600)
+        self.setMinimumWidth(self.minimumSizeHint().width())
 
     def _update_colormaps(self):
         """update the colormap of all the available cameras"""
