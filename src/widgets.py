@@ -341,7 +341,7 @@ class ImageWidget(QtWidgets.QLabel):
         self._hover.setVisible(False)
 
 
-class CameraWidget(QtWidgets.QGroupBox):
+class CameraWidget(QtWidgets.QWidget):
     """
     Initialize a widget communicating to a camera device being capable of
     showing the captured data.
@@ -459,13 +459,15 @@ class CameraWidget(QtWidgets.QGroupBox):
         close_icon = close_icon.scaled(ICON_SIZE, ICON_SIZE)
         self._close_widget = QtWidgets.QPushButton()
         self._close_widget.setIcon(QtGui.QIcon(close_icon))
-        # self._close_widget.setFlat(True)
         self._close_widget.clicked.connect(self._close)
         cls_wdg = OptionWidget(
             widgets=[self._close_widget],
             label="",
             tooltip="Close the communication with this camera.",
         )
+
+        # label widget
+        label = QtWidgets.QLabel(self._device.id)
 
         # policies and alignment
         policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
@@ -475,6 +477,7 @@ class CameraWidget(QtWidgets.QGroupBox):
         # setup the options panel
         opt_layout = QtWidgets.QHBoxLayout()
         opt_layout.addStretch()
+        opt_layout.addWidget(label)
         opt_layout.addWidget(rot_wdg)
         opt_layout.addWidget(cls_wdg)
         opt_layout.addStretch()
@@ -495,7 +498,6 @@ class CameraWidget(QtWidgets.QGroupBox):
         layout.addWidget(opt_wdg)
         self.setLayout(layout)
         self.setSizePolicy(policy_exp, policy_exp)
-        self.setTitle(self._device.id)
 
 
 class DeviceDialog(QtWidgets.QDialog):
