@@ -56,19 +56,7 @@ class HoverWidget(QtWidgets.QWidget):
         flags = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint  # type: ignore
         self.setWindowFlags(flags)
         self._labels = {}
-        self.setStyleSheet("background-color: rgba(0, 0, 0, 10)")
-        path = QtGui.QPainterPath()
-        rect = self.rect()
-        path.addRoundedRect(
-            rect.x(),
-            rect.y(),
-            rect.width(),
-            rect.height(),
-            10.0,
-            10.0,
-        )
-        mask = QtGui.QRegion(path.toFillPolygon().toPolygon())
-        self.setMask(mask)
+        self.setStyleSheet("background-color: rgba(0, 0, 0, 100)")
 
     def add_label(
         self,
