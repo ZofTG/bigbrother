@@ -401,16 +401,14 @@ class LeptonDevice(Device):
 
     def stop_streaming(self):
         """stop the data streaming"""
+        self._reader.StopGraph()
         super().stop_streaming()
-        if self.streaming:
-            self._reader.StopGraph()
 
     def connect(self):
         """setup the device connection"""
         if not self.connected:
             self._stream = self._sensor.Open()
             self._stream.sys.RunFFCNormalization()
-            # self._stream.sys.SetGainMode(CCI.Sys.GainMode.HIGH)
             self._stream.rad.SetTLinearEnableStateChecked(True)
         self._connected = True
 
@@ -418,7 +416,7 @@ class LeptonDevice(Device):
         """interrupt the connection to the device"""
         if self.streaming:
             self.stop_streaming()
-        if self.connected:
+        if self._stream is not None:
             self._stream = self._stream.port.Dispose()
         self._connected = False
 

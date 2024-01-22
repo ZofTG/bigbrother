@@ -468,7 +468,7 @@ class CameraWidget(QtWidgets.QGroupBox):
         )
 
         # policies and alignment
-        policy_exp = QtWidgets.QSizePolicy.Policy.Expanding
+        policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
         policy_min = QtWidgets.QSizePolicy.Policy.Minimum
         alignment = QtCore.Qt.AlignmentFlag.AlignHCenter
 
