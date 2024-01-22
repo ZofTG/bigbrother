@@ -7,7 +7,7 @@ import sys
 
 from PyQt5 import QtWidgets
 
-from src import MultiCameraReader
+from src import BigBrother
 
 
 #! MAIN
@@ -15,7 +15,7 @@ from src import MultiCameraReader
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
-    mainwindow = MultiCameraReader()
+    mainwindow = BigBrother()
     mainwindow.show()
     status = app.exec()
     sys.exit(status)

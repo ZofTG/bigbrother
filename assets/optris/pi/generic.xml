@@ -31,8 +31,8 @@
   </temperature>
   <optics_text></optics_text>
   -->
-  <formatspath>.\\multicamerareader\\assets\\drivers\\optris\\pi\\</formatspath>
-  <calipath>.\\multicamreader\\assets\\optris\\pi\\calibration_files\\</calipath>
+  <formatspath>.\\assets\\drivers\\optris\\pi\\</formatspath>
+  <calipath>.\\_optris\\pi\\calibration_files\\</calipath>
   <serial>0</serial>                     <!-- Provide serial number, if you attach more than one camera -->
   <videoformatindex>0</videoformatindex> <!-- index of the used video format resolution and framerate (USB enpoint): http://documentation.evocortex.com/libirimager2/html/index.html#sec_videoformat -->
   <framerate>27.0</framerate>             <!-- only scaled down frame rate, maximum framerate depends on the chosen <videoformatindex> -->

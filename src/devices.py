@@ -9,6 +9,7 @@ import platform
 import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
+from os import makedirs
 from os.path import join, dirname
 from threading import Thread
 from typing import Any, Callable, Tuple, Union
@@ -99,7 +100,6 @@ class Device(ABC):
     _rot_angle: float
     _last: Union[None, Tuple[datetime, NDArray[Union[np.uint8, np.float_]]]]
     _last_changed: Signal
-    _port: int
     _connected: bool
 
     @staticmethod
@@ -145,11 +145,6 @@ class Device(ABC):
     def streaming(self):
         """returns True if the device is streaming data."""
         return self._streaming
-
-    @property
-    def port(self):
-        """return the connection port"""
-        return self._port
 
     @property
     def connected(self):
@@ -265,25 +260,35 @@ class Device(ABC):
         self._recording = False
         self._connected = False
 
-        # find the device
-        devs = self.get_available_devices()
-        valid_port = [i for i, v in enumerate(devs) if v == id]
-        if len(valid_port) == 0:
-            raise ValueError(f"No devices have been found with the {id} id.")
-        self._port = valid_port[0]
-
 
 class OpticalDevice(Device):
     """Initialize an optical device object"""
 
     _device: cv2.VideoCapture  # type: ignore
     _reader: Thread
+    _port: int
+
+    @property
+    def port(self):
+        """return the connection port"""
+        return self._port
 
     def __init__(self, device_id: str):
         """constructor"""
         super().__init__(device_id)
         self._device = None  # type: ignore
         self._reader = Thread(target=self._add_frame)
+
+        # find the device
+        devs = [
+            i
+            for i in self.get_available_devices()
+            if not (i.lower().startswith("purethermal") or i == "PI IMAGER")
+        ]
+        valid_port = [i for i, v in enumerate(devs) if v == self.id]
+        if len(valid_port) == 0:
+            raise ValueError(f"No devices have been found with the {id} id.")
+        self._port = valid_port[0]
 
     def _add_frame(self):
         """add a new frame to the buffer of readed data."""
@@ -484,7 +489,10 @@ class OptrisPiDevice(Device):
         if not self.connected:
             specs = join(PI_PATH, "generic.xml").encode()
             path = PI_PATH.encode()
-            ret = self._device.evo_irimager_usb_init(specs, path, None)
+            cwd = join("_optris", "pi", "logs")
+            makedirs(cwd, exist_ok=True)
+            cwd = join(cwd, "log").encode()
+            ret = self._device.evo_irimager_usb_init(specs, path, cwd)
             self._connected = ret == 0
             if not self._connected:
                 raise RuntimeError(f"Impossible to connect to {id}")

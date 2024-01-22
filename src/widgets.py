@@ -18,7 +18,7 @@ from PyQt5.QtCore import Qt
 
 from . import devices
 
-__all__ = ["MultiCameraReader"]
+__all__ = ["BigBrother"]
 
 
 #! CONSTANTS
@@ -331,7 +331,7 @@ class ImageWidget(QtWidgets.QLabel):
         super().__init__()
 
         # policies and alignment
-        policy_exp = QtWidgets.QSizePolicy.Policy.Expanding
+        policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
         halignment = QtCore.Qt.AlignmentFlag.AlignHCenter
         valignment = QtCore.Qt.AlignmentFlag.AlignVCenter
 
@@ -458,7 +458,6 @@ class CameraWidget(QtWidgets.QGroupBox):
         rotation_icon = rotation_icon.scaled(ICON_SIZE, ICON_SIZE)
         self._rotation_widget = QtWidgets.QPushButton()
         self._rotation_widget.setIcon(QtGui.QIcon(rotation_icon))
-        # self._rotation_widget.setFlat(True)
         self._rotation_widget.clicked.connect(self._rotate_image)
         rot_wdg = OptionWidget(
             widgets=[self._rotation_widget],
@@ -649,7 +648,7 @@ class OptionWidget(QtWidgets.QWidget):
         return self._label
 
 
-class MultiCameraReader(QtWidgets.QMainWindow):
+class BigBrother(QtWidgets.QMainWindow):
     """
     MultiCameraReader Application
 
