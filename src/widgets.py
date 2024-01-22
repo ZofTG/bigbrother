@@ -468,6 +468,7 @@ class CameraWidget(QtWidgets.QWidget):
 
         # label widget
         label = QtWidgets.QLabel(self._device.id)
+        label.setMinimumSize(label.minimumSizeHint())
 
         # policies and alignment
         policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
