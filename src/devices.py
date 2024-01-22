@@ -9,7 +9,7 @@ import platform
 import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
-from os import makedirs
+from os import makedirs, remove, getcwd
 from os.path import join, dirname
 from threading import Thread
 from typing import Any, Callable, Tuple, Union
@@ -494,6 +494,8 @@ class OptrisPiDevice(Device):
             self._connected = ret == 0
             if not self._connected:
                 raise RuntimeError(f"Impossible to connect to {id}")
+            else:
+                remove(join(getcwd(), "log.txt"))
 
     def disconnect(self):
         """interrupt the connection to the device"""

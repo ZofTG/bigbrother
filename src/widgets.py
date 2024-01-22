@@ -640,7 +640,7 @@ class OptionWidget(QtWidgets.QWidget):
 
 class BigBrother(QtWidgets.QMainWindow):
     """
-    MultiCameraReader Application
+    BigBrother Application
 
     Generate a Graphical interface capable of connecting and recording
     data simultaneously from multiple video devices.
@@ -814,7 +814,7 @@ class BigBrother(QtWidgets.QMainWindow):
 
         # window setup
         self._check_enabled()
-        self.setWindowTitle("MultiCamReader")
+        self.setWindowTitle("BigBrother")
         self.setWindowIcon(main_icon)
         self.setStyleSheet("background-color: white")
         self.setFont(QtGui.QFont("Arial", 12))
