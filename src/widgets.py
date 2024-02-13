@@ -3,10 +3,11 @@
 #! IMPORTS
 
 
+import json
 from collections import deque
 from datetime import datetime
-import json
-from os.path import dirname, join, sep, exists
+from os import walk
+from os.path import dirname, exists, join, sep
 from typing import Any, Dict, List, Tuple, Union
 
 import cv2
@@ -849,12 +850,7 @@ class BigBrother(QtWidgets.QMainWindow):
     @property
     def configuration_file(self):
         """return the configuration file"""
-        root = dirname(__file__)
-        try:
-            root = dirname(root)
-        except Exception:
-            pass
-        return join(root, "_configuration.json")
+        return join("C:", "_bbconf.json")
 
     def _update_colormaps(self):
         """update the colormap of all the available cameras"""
