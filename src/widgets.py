@@ -1,12 +1,12 @@
 """gui module"""
 
-
 #! IMPORTS
 
 
 from collections import deque
 from datetime import datetime
-from os.path import dirname, join, sep
+import json
+from os.path import dirname, join, sep, exists
 from typing import Any, Dict, List, Tuple, Union
 
 import cv2
@@ -504,6 +504,7 @@ class CameraWidget(QtWidgets.QWidget):
         layout.addWidget(opt_wdg)
         self.setLayout(layout)
         self.setSizePolicy(policy_exp, policy_exp)
+        self.setMinimumHeight(100)
 
 
 class DeviceDialog(QtWidgets.QDialog):
@@ -654,6 +655,7 @@ class BigBrother(QtWidgets.QMainWindow):
 
     # general variables
     _path: str
+    _configuration: Dict[str, Any]
     _buffer: Dict[CameraWidget, deque]
     _recording_handler: QtCore.QTimer
 
@@ -686,9 +688,20 @@ class BigBrother(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # retrieve the configuration file
+        if not exists(self.configuration_file):
+            self._configuration = {
+                "sfrq": 6,
+                "path": dirname(__file__),
+                "cmap": COLORMAPS[0],
+            }
+        else:
+            with open(self.configuration_file, "r") as buf:
+                self._configuration = json.load(buf)
+
         # variables init
         self._buffer = {}
-        self._path = dirname(__file__)
+        self._path = self.config["path"]
         self._last_time = datetime.now()
         self._recording_handler = QtCore.QTimer()
         self._recording_handler.timeout.connect(self._recorder)
@@ -731,7 +744,7 @@ class BigBrother(QtWidgets.QMainWindow):
 
         # recording frequency widget
         self._rec_freq_spinbox = QtWidgets.QSpinBox()
-        self._rec_freq_spinbox.setValue(10)
+        self._rec_freq_spinbox.setValue(self.config["sfrq"])
         self._rec_freq_spinbox.setMaximum(30)
         self._rec_freq_spinbox.setMinimum(1)
         self._rec_freq_spinbox.setSingleStep(1)
@@ -779,6 +792,8 @@ class BigBrother(QtWidgets.QMainWindow):
         # colormap widget
         self._colormap_box = QtWidgets.QComboBox()
         self._colormap_box.addItems(COLORMAPS)
+        cmap = [i for i, v in enumerate(COLORMAPS) if v == self.config["cmap"]]
+        self._colormap_box.setCurrentIndex(int(cmap[0]))
         self._colormap_box.setFixedWidth(200)
         self._colormap_wdg = OptionWidget(
             widgets=[self._colormap_box],
@@ -825,6 +840,21 @@ class BigBrother(QtWidgets.QMainWindow):
         self.setStyleSheet("background-color: white")
         self.setFont(QtGui.QFont("Arial", 12))
         self.setMinimumWidth(self.minimumSizeHint().width())
+
+    @property
+    def config(self):
+        """return the configuration file"""
+        return self._configuration
+
+    @property
+    def configuration_file(self):
+        """return the configuration file"""
+        root = dirname(__file__)
+        try:
+            root = dirname(root)
+        except Exception:
+            pass
+        return join(root, "_configuration.json")
 
     def _update_colormaps(self):
         """update the colormap of all the available cameras"""
@@ -1064,6 +1094,19 @@ class BigBrother(QtWidgets.QMainWindow):
         """
         override the close event forcing the disconnection from all devices
         """
+        # ensure all devices are disconnected
         for cam in list(self._buffer.keys()):
             cam.device.disconnect()
+
+        # save the configuration
+        self._configuration = {
+            "sfrq": int(self._rec_freq_spinbox.value()),
+            "path": self._path,
+            "cmap": self._colormap_box.currentText(),
+        }
+
+        with open(self.configuration_file, "w") as buf:
+            json.dump(self.config, buf)
+
+        # close
         super().closeEvent(event)
