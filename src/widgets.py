@@ -6,7 +6,6 @@
 import json
 from collections import deque
 from datetime import datetime
-from os import walk
 from os.path import dirname, exists, join, sep
 from typing import Any, Dict, List, Tuple, Union
 
