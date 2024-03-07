@@ -5,3 +5,4 @@ numpy
 pythonnet==2.5.2
 pyinstaller
 pillow
+pytest
