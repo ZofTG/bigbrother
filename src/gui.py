@@ -17,6 +17,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
 from .devices import *
+from .assets import *
 
 
 #! CONSTANTS
@@ -27,8 +28,19 @@ COLORMAPS = [
     for i in cv2.__dict__
     if i.startswith("COLORMAP")
 ]
-ICON_PATH = "icons"
 ICON_SIZE = 50
+
+
+#! FUNCTIONS
+
+
+def to_pixmap(b64: str, size: int = ICON_SIZE):
+    """convert the input string into a pixmap"""
+    barr = QtCore.QByteArray.fromBase64(bytes(b64, "utf-8"))
+    pix = QtGui.QPixmap()
+    pix.loadFromData(barr, "png")
+    pix = pix.scaled(size, size)
+    return pix
 
 
 #! CLASSES
@@ -439,9 +451,7 @@ class CameraWidget(QtWidgets.QWidget):
         self._closed = Signal()
 
         # camera rotation
-        rotation_path = join(ICON_PATH, "rotate.png")
-        rotation_icon = QtGui.QPixmap(rotation_path)
-        rotation_icon = rotation_icon.scaled(ICON_SIZE, ICON_SIZE)
+        rotation_icon = to_pixmap(ROTATE)
         self._rotation_widget = QtWidgets.QPushButton()
         self._rotation_widget.setIcon(QtGui.QIcon(rotation_icon))
         self._rotation_widget.clicked.connect(self._rotate_image)
@@ -452,9 +462,7 @@ class CameraWidget(QtWidgets.QWidget):
         )
 
         # close widget
-        close_path = join(ICON_PATH, "close.png")
-        close_icon = QtGui.QPixmap(close_path)
-        close_icon = close_icon.scaled(ICON_SIZE, ICON_SIZE)
+        close_icon = to_pixmap(CLOSE)
         self._close_widget = QtWidgets.QPushButton()
         self._close_widget.setIcon(QtGui.QIcon(close_icon))
         self._close_widget.clicked.connect(self._close)
@@ -705,29 +713,19 @@ class IRCam(QtWidgets.QMainWindow):
         self._recording_handler.timeout.connect(self._recorder)
 
         # icons
-        rec_path = join(ICON_PATH, "rec.png")
-        rec_icon = QtGui.QPixmap(rec_path)
-        rec_icon = rec_icon.scaled(ICON_SIZE, ICON_SIZE)
+        rec_icon = to_pixmap(REC)
         self._rec_icon = QtGui.QIcon(rec_icon)
 
-        stop_path = join(ICON_PATH, "stop.png")
-        stop_icon = QtGui.QPixmap(stop_path)
-        stop_icon = stop_icon.scaled(ICON_SIZE, ICON_SIZE)
+        stop_icon = to_pixmap(STOP)
         self._stop_icon = QtGui.QIcon(stop_icon)
 
-        save_path = join(ICON_PATH, "save.png")
-        save_icon = QtGui.QPixmap(save_path)
-        save_icon = save_icon.scaled(ICON_SIZE, ICON_SIZE)
+        save_icon = to_pixmap(SAVE)
         save_icon = QtGui.QIcon(save_icon)
 
-        add_path = join(ICON_PATH, "add.png")
-        add_icon = QtGui.QPixmap(add_path)
-        add_icon = add_icon.scaled(ICON_SIZE, ICON_SIZE)
+        add_icon = to_pixmap(ADD)
         add_icon = QtGui.QIcon(add_icon)
 
-        main_path = join(ICON_PATH, "main.png")
-        main_icon = QtGui.QPixmap(main_path)
-        main_icon = main_icon.scaled(ICON_SIZE, ICON_SIZE)
+        main_icon = to_pixmap(MAIN)
         main_icon = QtGui.QIcon(main_icon)
 
         # size policies

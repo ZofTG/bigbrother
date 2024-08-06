@@ -23,7 +23,6 @@ def main():
     # run command
     msg = ["pyinstaller", "--name IRCam", "--clean"]
     msg += ['--add-data "assets;assets"']
-    msg += ['--add-data "icons;icons"']
     msg += ["--noconsole", f"--icon {icon_file}"]
     msg += ["--onefile run.py"]
     subprocess.run(" ".join(msg))
