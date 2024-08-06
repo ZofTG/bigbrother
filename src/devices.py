@@ -9,7 +9,7 @@ import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import makedirs, remove, getcwd
-from os.path import join
+from os.path import join, dirname
 from threading import Thread
 from typing import Any, Callable, Tuple, Union
 
@@ -33,8 +33,9 @@ __all__ = [
 
 
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
-LEPTON_PATH = join("assets", "flir", "lepton")
-PI_PATH = join("assets", "optris", "pi")
+root = dirname(dirname(__file__))
+LEPTON_PATH = join(root, "assets", "flir", "lepton")
+PI_PATH = join(root, "assets", "optris", "pi")
 
 
 #! CLASSES
@@ -339,12 +340,11 @@ class LeptonDevice(Device):
 
         # check whether python is running as 64bit or 32bit to import the right
         # .NET dll
-        if platform.architecture()[0] == "64bit":
-            sys.path.append(join(LEPTON_PATH, "x64"))
-        else:
-            sys.path.append(join(LEPTON_PATH, "x86"))
-        clr.AddReference("LeptonUVC")  # type: ignore
-        clr.AddReference("ManagedIR16Filters")  # type: ignore
+        architecture = "x64" if platform.architecture()[0] == "64bit" else "x86"
+        leptonuvc = join(LEPTON_PATH, architecture, "LeptonUVC")
+        irmanager = join(LEPTON_PATH, architecture, "ManagedIR16Filters")
+        clr.AddReference(leptonuvc)  # type: ignore
+        clr.AddReference(irmanager)  # type: ignore
 
         from IR16Filters import IR16Capture, NewBytesFrameEvent
         from Lepton import CCI
