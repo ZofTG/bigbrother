@@ -5,7 +5,6 @@
 
 import ctypes as ct
 import platform
-import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import makedirs, remove, getcwd

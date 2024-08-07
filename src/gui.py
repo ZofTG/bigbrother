@@ -7,7 +7,7 @@ import json
 from collections import deque
 from datetime import datetime
 from os.path import dirname, exists, join, sep
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union, Literal
 
 import cv2
 import numpy as np
@@ -145,11 +145,12 @@ class ImageWidget(QtWidgets.QLabel):
     """render an image on a widget"""
 
     _data: Union[NDArray[Any], None]
-    _pix: Union[None, QtGui.QPixmap]
+    _pix: QtGui.QPixmap
     _fps: Union[float, None]
     _hover: HoverWidget
     _mouse_coords: Union[None, Tuple[int, int, int, int]]
     _colormap: int
+    _ranges: Union[NDArray[Any], None]
 
     @property
     def hover(self):
@@ -165,6 +166,11 @@ class ImageWidget(QtWidgets.QLabel):
     def fps(self):
         """return the actual fps"""
         return self._fps
+
+    @property
+    def ranges(self):
+        """return the actual colormap ranges"""
+        return self._ranges
 
     @property
     def mouse_coords(self):
@@ -291,19 +297,14 @@ class ImageWidget(QtWidgets.QLabel):
         if self._data is None:
             img = np.random.randn(size.height(), size.width())
         else:
-            # check a colormap has to be applied to the data
-            if self._data.shape[-1] == 1:
-                # commute the available data into a greyscale image
-                minv = np.min(self._data)
-                img = self._data - minv
-                img /= np.max(self._data) - minv
-                img = (img * 255).astype(np.uint8)
-                img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            img = self._data.copy()
 
-                # apply the colormap
-                img = cv2.applyColorMap(img, self._colormap)
-            else:
-                img = self._data.copy()
+        # apply the colormap if applicable
+        if self.ranges is not None:
+            minv, maxv = self.ranges
+            img = ((img - minv) / (maxv - minv) * 255).astype(np.uint8)
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            img = cv2.applyColorMap(img, self._colormap)
 
         # convert to pixmap and store
         pix = QtGui.QPixmap.fromImage(qimage2ndarray.array2qimage(img))
@@ -318,11 +319,13 @@ class ImageWidget(QtWidgets.QLabel):
         data: NDArray[Any],
         fps: float,
         colormap: int,
+        ranges: Union[None, NDArray[Any]],
     ):
         """update the data to be viewed"""
         self._data = data
         self._fps = fps
         self._colormap = colormap
+        self._ranges = ranges
         self._update_view()
 
     def __init__(self):
@@ -351,6 +354,307 @@ class ImageWidget(QtWidgets.QLabel):
         self._hover.setVisible(False)
 
 
+class QLabelledSlider(QtWidgets.QWidget):
+    """
+    a slider linked to a label showing its value
+
+    Parameters
+    ----------
+    value: int (optional, default=0)
+        the default slider value
+
+    minimum: int (optional, default=0)
+        the default slider minimum value
+
+    maximum: int (optional, default=1)
+        the default slider maximum value
+
+    step: int (optional, default=1)
+        the default slider step value
+
+    side: Literal['right', 'left']
+        the side where to display the label
+    """
+
+    _label: QtWidgets.QLabel
+    _slider: QtWidgets.QSlider
+    _value_changed: Signal
+
+    def __init__(
+        self,
+        value: int = 0,
+        minimum: int = 0,
+        maximum: int = 1,
+        step: int = 1,
+        side: Literal["right", "left"] = "left",
+    ):
+        super().__init__()
+        layout = QtWidgets.QHBoxLayout()
+        self._slider = QtWidgets.QSlider()
+        self._label = QtWidgets.QLabel()
+        self._value_changed = Signal()
+        self._slider.valueChanged.connect(self._on_value_change)
+        self._slider.setOrientation(Qt.Orientation.Horizontal)
+        self.set_minimum(minimum)
+        self.set_maximum(maximum)
+        self.set_value(value)
+        self.set_step(step)
+        if side == "right":
+            align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            layout.addWidget(self._slider)
+            layout.addWidget(self._label)
+        else:
+            align = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            layout.addWidget(self._label)
+            layout.addWidget(self._slider)
+        self._label.setAlignment(align)
+        self.setLayout(layout)
+
+    def _on_value_change(self):
+        """private method used to update label and trigger valueChanged events"""
+        self._label.setText(str(self.value))
+        self._value_changed.emit(self.value)
+
+    def set_minimum(self, value: int):
+        """set the minimum value of the slider"""
+        self._slider.setMinimum(value)
+
+    def set_maximum(self, value: int):
+        """set the maximum value of the slider"""
+        self._slider.setMaximum(value)
+
+    def set_step(self, value: int):
+        """set the step value of the slider"""
+        self._slider.setSingleStep(value)
+
+    def set_value(self, value: int):
+        """set the minimum value of the slider"""
+        self._slider.setValue(value)
+
+    @property
+    def minimum(self):
+        """the minimum slider value"""
+        return int(self._slider.minimum())
+
+    @property
+    def maximum(self):
+        """the maximum slider value"""
+        return int(self._slider.maximum())
+
+    @property
+    def step(self):
+        """the single step slider value"""
+        return int(self._slider.singleStep())
+
+    @property
+    def value(self):
+        """the slider value"""
+        return int(self._slider.value())
+
+    @property
+    def value_changed(self):
+        """the value changed signal"""
+        return self._value_changed
+
+
+class QRangeSlider(QtWidgets.QWidget):
+    """
+    generate a range slider
+
+    Parameters
+    ----------
+    value: Tuple[int, int] (optional, default=(0, 3))
+        the default slider range
+
+    minimum: int (optional, default=0)
+        the default slider minimum value
+
+    maximum: int (optional, default=3)
+        the default slider maximum value
+
+    step: int (optional, default=1)
+        the default slider step value
+
+    active: bool (optional, default=True)
+        should the range be active?
+    """
+
+    _left: QLabelledSlider
+    _right: QLabelledSlider
+    _active: QtWidgets.QCheckBox
+    _value_changed: Signal
+
+    def __init__(
+        self,
+        value: Tuple[int, int] = (0, 3),
+        minimum: int = 0,
+        maximum: int = 2,
+        step: int = 1,
+        active: bool = True,
+    ):
+        super().__init__()
+        self._value_changed = Signal()
+        layout = QtWidgets.QHBoxLayout()
+        self._left = QLabelledSlider(
+            value=value[0],
+            minimum=minimum,
+            maximum=maximum - 2,
+            step=step,
+            side="left",
+        )
+        self._right = QLabelledSlider(
+            value=value[1],
+            minimum=maximum - 1,
+            maximum=maximum,
+            step=step,
+            side="right",
+        )
+        self._active = QtWidgets.QCheckBox("Active")
+        self._active.setChecked(active)
+        self._active.stateChanged.connect(self._check_pressed)
+        layout.addWidget(self._left)
+        layout.addWidget(self._right)
+        layout.addWidget(self._active)
+        self.setLayout(layout)
+
+        # adjust the values
+        self._left.value_changed.connect(self._on_value_change)
+        self._right.value_changed.connect(self._on_value_change)
+        self._on_value_change()
+        self._check_pressed()
+
+    def _on_value_change(self, *args, **kwargs):
+        """internal method used to handle the value update"""
+        vall = self._left.value
+        valr = self._right.value
+        self._left.set_maximum(valr - 1)
+        self._right.set_minimum(vall + 1)
+        return self._value_changed.emit(self.value)
+
+    def _check_pressed(self):
+        """handle the press of the active checkbox"""
+        self._left.setEnabled(self.is_active())
+        self._right.setEnabled(self.is_active())
+
+    def is_active(self):
+        """return True if the actual object is active"""
+        return bool(self._active.isChecked())
+
+    def set_minimum(self, value: int):
+        """set the minimum value of the slider"""
+        self._left.set_minimum(value)
+
+    def set_maximum(self, value: int):
+        """set the maximum value of the slider"""
+        self._right.set_maximum(value)
+
+    def set_step(self, value: int):
+        """set the step value of the slider"""
+        self._left.set_step(value)
+        self._right.set_step(value)
+
+    def set_value(self, value: Tuple[int, int]):
+        """set the minimum value of the slider"""
+        self._left.set_value(value[0])
+        self._right.set_value(value[1])
+
+    @property
+    def minimum(self):
+        """the minimum slider value"""
+        return int(self._left.minimum())
+
+    @property
+    def maximum(self):
+        """the maximum slider value"""
+        return int(self._right.maximum())
+
+    @property
+    def step(self):
+        """the single step slider value"""
+        return int(self._left.singleStep())
+
+    @property
+    def value(self):
+        """the slider value"""
+        return (self._left.value, self._right.value)
+
+    @property
+    def value_changed(self):
+        """the value changed signal"""
+        return self._value_changed
+
+
+class RangeBox(QtWidgets.QWidget):
+    """
+    custom widget allowing to define the minimum and maximum values
+    accepted for each color/value channel of an image
+
+    Parameters
+    ----------
+    channels_n: int
+        the number of channels
+
+    minimum: int | float, (optional, default = -255)
+        the minimum acceptable value
+
+    maximum: int | float, (optional, default = 255)
+        the maximum acceptable value
+
+    orientation: Literal['vertical', 'horizontal'], (optional, default='vertical')
+        the orientation of each box
+    """
+
+    _channels: List[QRangeSlider]
+
+    def __init__(
+        self,
+        channels_n: int,
+        minimum: int = -255,
+        maximum: int = 255,
+        orientation: Literal["vertical", "horizontal"] = "horizontal",
+    ):
+        super().__init__()
+        # setup the channels
+        self._channels = []
+        if orientation == "vertical":
+            layout = QtWidgets.QVBoxLayout()
+        else:
+            layout = QtWidgets.QHBoxLayout()
+        for i in range(channels_n):
+            channel = QRangeSlider()
+            channel.set_minimum(minimum)
+            channel.set_maximum(maximum)
+            channel.set_value((minimum, maximum))
+            channel.set_step(1)
+            channel.setContentsMargins(0, 0, 0, 0)
+            label = QtWidgets.QLabel("chn " + str(i + 1))
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            linel = QtWidgets.QVBoxLayout()
+            linel.addWidget(label)
+            linel.addWidget(channel)
+            linel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            linew = QtWidgets.QWidget()
+            linew.setLayout(linel)
+            linew.setContentsMargins(0, 0, 0, 0)
+            self._channels += [channel]
+            layout.addWidget(linew)
+
+        # set the widget layout
+        layout.setSpacing(0)
+        self.setLayout(layout)
+
+    @property
+    def value(self):
+        """return the actual range values of each channel"""
+        out = [channel.value for channel in self._channels]
+        return np.atleast_2d(out).astype(float)
+
+    @property
+    def active_state(self):
+        """return the actual active state of each channel"""
+        return [channel.is_active() for channel in self._channels]
+
+
 class CameraWidget(QtWidgets.QWidget):
     """
     Initialize a widget communicating to a camera device being capable of
@@ -371,6 +675,12 @@ class CameraWidget(QtWidgets.QWidget):
     _data: Union[None, NDArray[Any]]
     _fps: Union[None, float]
     _colormap: int
+    _rangebox: RangeBox
+
+    @property
+    def rangebox(self):
+        """return the rangebox"""
+        return self._rangebox
 
     @property
     def device(self):
@@ -415,7 +725,28 @@ class CameraWidget(QtWidgets.QWidget):
 
     def _update_view(self):
         """update the data to be viewed"""
-        self._image_widget.update(self._data, self._fps, self._colormap)
+        if self._data is not None:
+            img = self._data.copy()
+
+            # filter the image according to the actual imposed ranges
+            states = self.rangebox.active_state
+            values = self.rangebox.value
+            for i in np.arange(len(states)):
+                if states[i]:
+                    minv, maxv = values[i]
+                    xi, yi, zi = np.where(img < minv)
+                    ki = np.where(zi == i)[0]
+                    img[xi[ki], yi[ki], zi[ki]] = minv
+                    xi, yi, zi = np.where(img > maxv)
+                    ki = np.where(zi == i)[0]
+                    img[xi[ki], yi[ki], zi[ki]] = maxv
+
+            # update the image
+            if img.shape[-1] == 1:
+                rngs = values[0]
+            else:
+                rngs = None
+            self._image_widget.update(img, self._fps, self._colormap, rngs)
 
     def _update_data(self):
         """update the available data"""
@@ -434,8 +765,6 @@ class CameraWidget(QtWidgets.QWidget):
         super().__init__()
 
         # setup the camera device
-        if not isinstance(device, Device):
-            raise TypeError("the passed device must be a Device instance.")
         self._device = device
         self._device.last_changed.connect(self._update_data)
 
@@ -475,6 +804,15 @@ class CameraWidget(QtWidgets.QWidget):
         # label widget
         label = QtWidgets.QLabel(self._device.id)
 
+        # rangebox
+        n_channels = 3 if isinstance(self.device, OpticalDevice) else 1
+        maxv = 255 if n_channels == 3 else 50
+        self._rangebox = RangeBox(
+            channels_n=n_channels,
+            minimum=0,
+            maximum=maxv,
+        )
+
         # policies and alignment
         policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
         policy_min = QtWidgets.QSizePolicy.Policy.Minimum
@@ -484,12 +822,17 @@ class CameraWidget(QtWidgets.QWidget):
         bottom_alignment = QtCore.Qt.AlignmentFlag.AlignBottom
 
         # setup the options panel
-        opt_layout = QtWidgets.QHBoxLayout()
-        opt_layout.addStretch()
-        opt_layout.addWidget(label)
-        opt_layout.addWidget(rot_wdg)
-        opt_layout.addWidget(cls_wdg)
-        opt_layout.addStretch()
+        linew = QtWidgets.QWidget()
+        linel = QtWidgets.QHBoxLayout()
+        linel.addStretch()
+        linel.addWidget(label)
+        linel.addWidget(rot_wdg)
+        linel.addWidget(cls_wdg)
+        linel.addStretch()
+        linew.setLayout(linel)
+        opt_layout = QtWidgets.QVBoxLayout()
+        opt_layout.addWidget(self._rangebox)
+        opt_layout.addWidget(linew)
         opt_layout.setAlignment(central_alignment)  # type: ignore
         opt_layout.setSpacing(0)
         opt_layout.setContentsMargins(0, 0, 0, 0)

@@ -10,7 +10,6 @@ from os.path import join
 
 from PIL import Image
 
-
 #! FUNCTION
 
 
