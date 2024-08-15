@@ -28,7 +28,7 @@ COLORMAPS = [
     for i in cv2.__dict__
     if i.startswith("COLORMAP")
 ]
-ICON_SIZE = 50
+ICON_SIZE = 60
 
 
 #! FUNCTIONS
@@ -332,13 +332,11 @@ class ImageWidget(QtWidgets.QLabel):
         super().__init__()
 
         # policies and alignment
-        policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
-        halignment = QtCore.Qt.AlignmentFlag.AlignHCenter
-        valignment = QtCore.Qt.AlignmentFlag.AlignVCenter
+        policy_exp = QtWidgets.QSizePolicy.Policy.Expanding
 
         # setup
+        self.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.setSizePolicy(policy_exp, policy_exp)
-        self.setAlignment(halignment | valignment)  # type: ignore
         self.setMouseTracking(True)
         self._data = None
         self._fps = np.nan
@@ -354,7 +352,7 @@ class ImageWidget(QtWidgets.QLabel):
         self._hover.setVisible(False)
 
 
-class QLabelledSlider(QtWidgets.QWidget):
+class LabelledSlider(QtWidgets.QWidget):
     """
     a slider linked to a label showing its value
 
@@ -376,7 +374,7 @@ class QLabelledSlider(QtWidgets.QWidget):
         the side where to display the label
     """
 
-    _label: QtWidgets.QLabel
+    _label: QtWidgets.QTextEdit
     _slider: QtWidgets.QSlider
     _value_changed: Signal
 
@@ -391,29 +389,48 @@ class QLabelledSlider(QtWidgets.QWidget):
         super().__init__()
         layout = QtWidgets.QHBoxLayout()
         self._slider = QtWidgets.QSlider()
-        self._label = QtWidgets.QLabel()
+        self._label = QtWidgets.QTextEdit()
+        self._label.textChanged.connect(self._on_label_change)
         self._value_changed = Signal()
-        self._slider.valueChanged.connect(self._on_value_change)
+        self._slider.valueChanged.connect(self._on_slider_change)
         self._slider.setOrientation(Qt.Orientation.Horizontal)
         self.set_minimum(minimum)
         self.set_maximum(maximum)
         self.set_value(value)
         self.set_step(step)
         if side == "right":
-            align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
             layout.addWidget(self._slider)
             layout.addWidget(self._label)
         else:
-            align = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             layout.addWidget(self._label)
             layout.addWidget(self._slider)
-        self._label.setAlignment(align)
         self.setLayout(layout)
+        self._label.setFixedWidth(ICON_SIZE)
+        self.setFixedHeight(ICON_SIZE)
+        self._slider.setMinimumWidth(2 * ICON_SIZE)
 
-    def _on_value_change(self):
+        # adjust the starting values
+        self._on_slider_change()
+
+    def _on_slider_change(self):
         """private method used to update label and trigger valueChanged events"""
         self._label.setText(str(self.value))
+        cur = self._label.textCursor()
+        cur.movePosition(
+            QtGui.QTextCursor.Right,
+            QtGui.QTextCursor.MoveAnchor,
+            len(self._label.toPlainText()),
+        )
+        self._label.setTextCursor(cur)
         self._value_changed.emit(self.value)
+
+    def _on_label_change(self):
+        """private method used to update slider value"""
+        try:
+            new = int(self._label.toPlainText())
+            self._slider.setValue(new)
+        except Exception:
+            pass
 
     def set_minimum(self, value: int):
         """set the minimum value of the slider"""
@@ -457,7 +474,7 @@ class QLabelledSlider(QtWidgets.QWidget):
         return self._value_changed
 
 
-class QRangeSlider(QtWidgets.QWidget):
+class RangeSlider(QtWidgets.QWidget):
     """
     generate a range slider
 
@@ -479,8 +496,8 @@ class QRangeSlider(QtWidgets.QWidget):
         should the range be active?
     """
 
-    _left: QLabelledSlider
-    _right: QLabelledSlider
+    _left: LabelledSlider
+    _right: LabelledSlider
     _active: QtWidgets.QCheckBox
     _value_changed: Signal
 
@@ -495,14 +512,14 @@ class QRangeSlider(QtWidgets.QWidget):
         super().__init__()
         self._value_changed = Signal()
         layout = QtWidgets.QHBoxLayout()
-        self._left = QLabelledSlider(
+        self._left = LabelledSlider(
             value=value[0],
             minimum=minimum,
             maximum=maximum - 2,
             step=step,
             side="left",
         )
-        self._right = QLabelledSlider(
+        self._right = LabelledSlider(
             value=value[1],
             minimum=maximum - 1,
             maximum=maximum,
@@ -512,10 +529,14 @@ class QRangeSlider(QtWidgets.QWidget):
         self._active = QtWidgets.QCheckBox("Active")
         self._active.setChecked(active)
         self._active.stateChanged.connect(self._check_pressed)
+        self._active.setFixedHeight(ICON_SIZE)
         layout.addWidget(self._left)
         layout.addWidget(self._right)
         layout.addWidget(self._active)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 5, 0)
         self.setLayout(layout)
+        self.setMinimumSize(self.minimumSizeHint())
 
         # adjust the values
         self._left.value_changed.connect(self._on_value_change)
@@ -557,6 +578,11 @@ class QRangeSlider(QtWidgets.QWidget):
         """set the minimum value of the slider"""
         self._left.set_value(value[0])
         self._right.set_value(value[1])
+
+    def set_label(self, value: str):
+        """set the RangeBox label"""
+        self._active.setText(value)
+        self.setFixedWidth(self.minimumSizeHint().width())
 
     @property
     def minimum(self):
@@ -604,7 +630,7 @@ class RangeBox(QtWidgets.QWidget):
         the orientation of each box
     """
 
-    _channels: List[QRangeSlider]
+    _channels: List[RangeSlider]
 
     def __init__(
         self,
@@ -621,32 +647,27 @@ class RangeBox(QtWidgets.QWidget):
         else:
             layout = QtWidgets.QHBoxLayout()
         for i in range(channels_n):
-            channel = QRangeSlider()
+            channel = RangeSlider()
             channel.set_minimum(minimum)
             channel.set_maximum(maximum)
             channel.set_value((minimum, maximum))
             channel.set_step(1)
-            channel.setContentsMargins(0, 0, 0, 0)
-            label = QtWidgets.QLabel("chn " + str(i + 1))
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            linel = QtWidgets.QVBoxLayout()
-            linel.addWidget(label)
-            linel.addWidget(channel)
-            linel.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            linew = QtWidgets.QWidget()
-            linew.setLayout(linel)
-            linew.setContentsMargins(0, 0, 0, 0)
+            channel.set_label("chn " + str(i + 1))
             self._channels += [channel]
-            layout.addWidget(linew)
+            layout.addWidget(channel)
 
         # set the widget layout
         layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
+        self.setFixedSize(self.minimumSizeHint())
 
     @property
     def value(self):
         """return the actual range values of each channel"""
-        out = [channel.value for channel in self._channels]
+        out = []
+        for channel in self._channels:
+            out += [channel.value if channel.is_active() else [None, None]]
         return np.atleast_2d(out).astype(float)
 
     @property
@@ -729,23 +750,21 @@ class CameraWidget(QtWidgets.QWidget):
             img = self._data.copy()
 
             # filter the image according to the actual imposed ranges
-            states = self.rangebox.active_state
-            values = self.rangebox.value
-            for i in np.arange(len(states)):
-                if states[i]:
-                    minv, maxv = values[i]
+            rngs = []
+            for i, vals in enumerate(self.rangebox.value):
+                minv, maxv = vals
+                if not np.isnan(minv):
                     xi, yi, zi = np.where(img < minv)
                     ki = np.where(zi == i)[0]
                     img[xi[ki], yi[ki], zi[ki]] = minv
+                if not np.isnan(maxv):
                     xi, yi, zi = np.where(img > maxv)
                     ki = np.where(zi == i)[0]
                     img[xi[ki], yi[ki], zi[ki]] = maxv
+                rngs += [np.min(img), np.max(img)]
+            rngs = np.squeeze(rngs) if img.shape[-1] == 1 else None
 
             # update the image
-            if img.shape[-1] == 1:
-                rngs = values[0]
-            else:
-                rngs = None
             self._image_widget.update(img, self._fps, self._colormap, rngs)
 
     def _update_data(self):
@@ -806,54 +825,52 @@ class CameraWidget(QtWidgets.QWidget):
 
         # rangebox
         n_channels = 3 if isinstance(self.device, OpticalDevice) else 1
-        maxv = 255 if n_channels == 3 else 50
+        maxv = 255 if n_channels == 3 else 273
+        minv = 0 if n_channels == 3 else -273
         self._rangebox = RangeBox(
             channels_n=n_channels,
-            minimum=0,
+            minimum=minv,
             maximum=maxv,
+            orientation="vertical",
         )
-
-        # policies and alignment
-        policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
-        policy_min = QtWidgets.QSizePolicy.Policy.Minimum
-        central_alignment = QtCore.Qt.AlignmentFlag.AlignHCenter
-        right_alignment = QtCore.Qt.AlignmentFlag.AlignRight
-        vert_alignment = QtCore.Qt.AlignmentFlag.AlignVCenter
-        bottom_alignment = QtCore.Qt.AlignmentFlag.AlignBottom
 
         # setup the options panel
         linew = QtWidgets.QWidget()
         linel = QtWidgets.QHBoxLayout()
-        linel.addStretch()
         linel.addWidget(label)
         linel.addWidget(rot_wdg)
         linel.addWidget(cls_wdg)
-        linel.addStretch()
+        linel.setSpacing(0)
+        linel.setContentsMargins(0, 0, 0, 0)
+        linel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         linew.setLayout(linel)
+        linew.setFixedHeight(linew.minimumSizeHint().height())
         opt_layout = QtWidgets.QVBoxLayout()
-        opt_layout.addWidget(self._rangebox)
         opt_layout.addWidget(linew)
-        opt_layout.setAlignment(central_alignment)  # type: ignore
+        opt_layout.addWidget(self._rangebox)
+        opt_layout.addStretch()
         opt_layout.setSpacing(0)
         opt_layout.setContentsMargins(0, 0, 0, 0)
         opt_wdg = QtWidgets.QWidget()
         opt_wdg.setLayout(opt_layout)
-        opt_wdg.setSizePolicy(policy_min, policy_min)
         opt_wdg.setFont(QtGui.QFont("Arial", 10))
-        label.setSizePolicy(policy_exp, policy_min)
-        label.setAlignment(right_alignment | vert_alignment)  # type: ignore
+        opt_width = max(
+            self._rangebox.minimumSizeHint().width(),
+            linew.minimumSizeHint().width(),
+        )
+        opt_wdg.setFixedWidth(opt_width)
 
         # image panel
         self._image_widget = ImageWidget()
-        self._image_widget.setAlignment(central_alignment | bottom_alignment)  # type: ignore
+        self._image_widget.setMinimumHeight(opt_wdg.sizeHint().height())
 
         # widget layout
-        layout = QtWidgets.QVBoxLayout()
+        layout = QtWidgets.QHBoxLayout()
         layout.addWidget(self._image_widget)
         layout.addWidget(opt_wdg)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
-        self.setSizePolicy(policy_exp, policy_exp)
-        self.setMinimumHeight(100)
 
 
 class DeviceDialog(QtWidgets.QDialog):
@@ -968,22 +985,22 @@ class OptionWidget(QtWidgets.QWidget):
         """make option widgets"""
 
         # generate the output layout
-        policy_min = QtWidgets.QSizePolicy.Policy.Minimum
         lay = QtWidgets.QHBoxLayout()
         self._label = QtWidgets.QLabel(label)
         self._widgets = []
         for i, wdg in enumerate([self._label] + widgets):
             wdg.setFont(QtGui.QFont("Arial", 12))
-            wdg.setSizePolicy(policy_min, policy_min)
             lay.addWidget(wdg)
             if i > 0:
                 self._widgets += [wdg]
 
         # create the output widget
         super().__init__()
+        lay.setSpacing(0)
+        lay.setContentsMargins(5, 0, 5, 0)
         self.setLayout(lay)
-        self.setSizePolicy(policy_min, policy_min)
         self.setToolTip(tooltip)
+        self.setFixedHeight(self.minimumSizeHint().height())
 
     @property
     def widgets(self):
@@ -1032,7 +1049,7 @@ class IRCam(QtWidgets.QMainWindow):
     _colormap_wdg: OptionWidget
 
     # container
-    _container: QtWidgets.QGridLayout
+    _container: QtWidgets.QVBoxLayout
 
     def __init__(self):
         super().__init__()
@@ -1056,27 +1073,20 @@ class IRCam(QtWidgets.QMainWindow):
         self._recording_handler.timeout.connect(self._recorder)
 
         # icons
-        rec_icon = to_pixmap(REC)
-        self._rec_icon = QtGui.QIcon(rec_icon)
-
-        stop_icon = to_pixmap(STOP)
-        self._stop_icon = QtGui.QIcon(stop_icon)
-
-        save_icon = to_pixmap(SAVE)
-        save_icon = QtGui.QIcon(save_icon)
-
-        add_icon = to_pixmap(ADD)
-        add_icon = QtGui.QIcon(add_icon)
-
-        main_icon = to_pixmap(MAIN)
-        main_icon = QtGui.QIcon(main_icon)
+        self._rec_icon = QtGui.QIcon(to_pixmap(REC))
+        self._stop_icon = QtGui.QIcon(to_pixmap(STOP))
+        save_icon = QtGui.QIcon(to_pixmap(SAVE))
+        add_icon = QtGui.QIcon(to_pixmap(ADD))
+        main_icon = QtGui.QIcon(to_pixmap(MAIN))
 
         # size policies
-        policy_min = QtWidgets.QSizePolicy.Policy.Minimum
-        policy_exp = QtWidgets.QSizePolicy.Policy.MinimumExpanding
+        policy_exp = QtWidgets.QSizePolicy.Policy.Expanding
 
         # container widget
-        self._container = QtWidgets.QGridLayout()
+        self._container = QtWidgets.QVBoxLayout()
+        self._container.setSpacing(15)
+        self._container.setContentsMargins(0, 0, 0, 0)
+        self._container.setAlignment(Qt.AlignmentFlag.AlignTop)
         cnt_widget = QtWidgets.QWidget()
         cnt_widget.setLayout(self._container)
         cnt_widget.setSizePolicy(policy_exp, policy_exp)
@@ -1125,8 +1135,9 @@ class IRCam(QtWidgets.QMainWindow):
         rec_layout.addStretch()
         rec_layout.addWidget(self._save_wdg)
         rec_obj = QtWidgets.QWidget()
+        rec_layout.setSpacing(5)
+        rec_layout.setContentsMargins(0, 0, 0, 0)
         rec_obj.setLayout(rec_layout)
-        rec_obj.setSizePolicy(policy_min, policy_min)
 
         # colormap widget
         self._colormap_box = QtWidgets.QComboBox()
@@ -1160,14 +1171,18 @@ class IRCam(QtWidgets.QMainWindow):
         opt_layout.addStretch()
         opt_layout.addWidget(self._add_wdg)
         opt_layout.addStretch()
+        opt_layout.setSpacing(5)
+        opt_layout.setContentsMargins(5, 15, 5, 5)
         opt_wdg = QtWidgets.QWidget()
         opt_wdg.setLayout(opt_layout)
-        opt_wdg.setSizePolicy(policy_exp, policy_min)
+        opt_wdg.setFixedHeight(opt_wdg.minimumSizeHint().height())
 
         # setup the widget layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(cnt_widget)
         layout.addWidget(opt_wdg)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
         central_widget = QtWidgets.QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
@@ -1208,12 +1223,15 @@ class IRCam(QtWidgets.QMainWindow):
             data_exist = any(len(v) > 0 for v in self._buffer.values())
         else:
             data_exist = False
+        rgb_cam_only = all(
+            [isinstance(i.device, OpticalDevice) for i in self._buffer.keys()]
+        )
 
         # apply
         self._save_wdg.setEnabled(~rec_checked & data_exist)
         self._frq_wdg.setEnabled(~rec_checked & cam_exist)
         self._rec_wdg.setEnabled(cam_exist)
-        self._colormap_wdg.setEnabled(cam_exist)
+        self._colormap_wdg.setEnabled(cam_exist & ~rgb_cam_only)
         self._add_wdg.setEnabled(~rec_checked)
         for cam in list(self._buffer.keys()):
             cam.setEnabled(~rec_checked)
@@ -1392,21 +1410,15 @@ class IRCam(QtWidgets.QMainWindow):
         cameras.
         """
         # clean the actual container layout
-        for row in np.arange(self._container.rowCount()):
-            for col in np.arange(self._container.columnCount()):
-                item = self._container.itemAtPosition(row, col)
-                self._container.removeItem(item)
+        for row in np.arange(self._container.count()):
+            item = self._container.itemAt(row)
+            self._container.removeItem(item)
 
         # refresh the layout
         cams = list(self._buffer.keys())
-        ncam = len(cams)
-        if ncam > 0:
-            rows = int(np.floor(ncam**0.5))
-            cols = int(np.ceil(ncam / rows))
-            for i, cam in enumerate(cams):
-                row = int(np.floor(i // cols))
-                col = i - row * cols
-                self._container.addWidget(cam, row, col)
+        if len(cams) > 0:
+            for cam in cams:
+                self._container.addWidget(cam)
         self._check_enabled()
 
     def _remove_camera(self, id: str):

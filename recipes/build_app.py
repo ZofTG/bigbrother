@@ -5,7 +5,7 @@
 
 import shutil
 import subprocess
-from os import remove
+from os import remove, getcwd, get_exec_path
 from os.path import join
 
 from PIL import Image
@@ -15,15 +15,19 @@ from PIL import Image
 
 def main():
     """build the exe"""
+    root = getcwd()
+
     # make the icon
     icon_file = "icon.ico"
-    Image.open(join("icons", "main.png")).save(icon_file)
+    Image.open(join(root, "icons", "main.png")).save(icon_file)
 
     # run command
+    runner = join(root, "run.py")
+    subprocess.run(join(root, ".venv", "Scripts", "activate"))
     msg = ["pyinstaller", "--name IRCam", "--clean"]
     msg += ['--add-data "assets;assets"']
     msg += ["--noconsole", f"--icon {icon_file}"]
-    msg += ["--onefile run.py"]
+    msg += ["--onefile " + runner]
     subprocess.run(" ".join(msg))
 
     # move the exe to the home directory
