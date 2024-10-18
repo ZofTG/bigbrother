@@ -22,7 +22,7 @@ def main():
     Image.open(join(root, "icons", "main.png")).save(icon_file)
 
     # run command
-    msg = ["pyinstaller", "--name IRCam", "--clean"]
+    msg = [".venv\\Scripts\\python.exe", "pyinstaller", "--name IRCam", "--clean"]
     msg += ['--add-data "assets;assets"']
     msg += ["--noconsole", f"--icon {icon_file}"]
     msg += ["--onefile run.py"]

@@ -1336,7 +1336,7 @@ class IRCam(QtWidgets.QMainWindow):
                 writer = cv2.VideoWriter(
                     file + ".avi",
                     cv2.VideoWriter_fourcc(*"MJPG"),  # type: ignore
-                    30,
+                    int(self._rec_freq_spinbox.value()),
                     shape[:2],
                     shape[-1] > 1,
                 )
