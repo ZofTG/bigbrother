@@ -690,6 +690,7 @@ class CameraWidget(QtWidgets.QWidget):
     _timer: QtCore.QTimer
     _image_widget: ImageWidget
     _rotation_widget: QtWidgets.QPushButton
+    _mirror_widget: QtWidgets.QPushButton
     _close_widget: QtWidgets.QPushButton
     _device: Device
     _closed: Signal
@@ -736,7 +737,11 @@ class CameraWidget(QtWidgets.QWidget):
 
     def _rotate_image(self):
         """function used to rotate the image"""
-        self.device.set_rotation_angle((self.device.rot_angle + 90) % 360)
+        self.device.set_rotation_angle((self.device.rotation + 90) % 360)
+
+    def _mirror_image(self):
+        """function used to mirror the image"""
+        self.device.set_mirroring(self._mirror_widget.isChecked())
 
     def _close(self):
         """close the widget"""
@@ -799,14 +804,26 @@ class CameraWidget(QtWidgets.QWidget):
         self._closed = Signal()
 
         # camera rotation
-        rotation_icon = to_pixmap(ROTATE)
+        rotation_icon = QtGui.QIcon(to_pixmap(ROTATE))
         self._rotation_widget = QtWidgets.QPushButton()
-        self._rotation_widget.setIcon(QtGui.QIcon(rotation_icon))
+        self._rotation_widget.setIcon(rotation_icon)
         self._rotation_widget.clicked.connect(self._rotate_image)
         rot_wdg = OptionWidget(
             widgets=[self._rotation_widget],
             label="",
             tooltip="Rotate the image clockwise by 90 degrees.",
+        )
+
+        # camera mirroring
+        mirror_icon = QtGui.QIcon(to_pixmap(MIRROR))
+        self._mirror_widget = QtWidgets.QPushButton()
+        self._mirror_widget.setIcon(mirror_icon)
+        self._mirror_widget.setCheckable(True)
+        self._mirror_widget.clicked.connect(self._mirror_image)
+        mir_wdg = OptionWidget(
+            widgets=[self._mirror_widget],
+            label="",
+            tooltip="Mirror the image.",
         )
 
         # close widget
@@ -839,6 +856,7 @@ class CameraWidget(QtWidgets.QWidget):
         linel = QtWidgets.QHBoxLayout()
         linel.addWidget(label)
         linel.addWidget(rot_wdg)
+        linel.addWidget(mir_wdg)
         linel.addWidget(cls_wdg)
         linel.setSpacing(0)
         linel.setContentsMargins(0, 0, 0, 0)
@@ -1311,8 +1329,23 @@ class IRCam(QtWidgets.QMainWindow):
                 name = cam.device.id.replace("(", "").replace(")", "")
                 name = name.replace(".", "").replace(" ", "_")
                 name = name.replace(":", "").replace("-", "").lower()
-                file = join(path, "-".join([time, name]) + ".npz")
-                np.savez_compressed(file, **data)
+                file = join(path, "-".join([time, name]))
+                np.savez_compressed(file + ".npz", **data)
+                shape = list(data.values())[0].shape
+                shape = shape[:-1][::-1] + (shape[-1],)
+                writer = cv2.VideoWriter(
+                    file + ".avi",
+                    cv2.VideoWriter_fourcc(*"MJPG"),  # type: ignore
+                    30,
+                    shape[:2],
+                    shape[-1] > 1,
+                )
+                for frame in data.values():
+                    img = (frame / frame.max(axis=(0, 1)) * 255).astype(np.uint8)
+                    if shape[-1] > 1:
+                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    writer.write(img)
+                writer.release()
                 diag.setValue(diag.value() + 1)
                 if diag.wasCanceled():
                     break
